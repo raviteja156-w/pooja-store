@@ -1,0 +1,38 @@
+/* ---------- General polish ---------- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: #fdba74; border-radius: 999px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- Thermal receipt (hidden on screen, shown only when printing) ---------- */
+#printArea { display: none; }
+
+.receipt {
+  font-family: 'Courier New', Courier, monospace;
+  width: 78mm;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #000;
+}
+.r-center { text-align: center; }
+.r-bold { font-weight: 700; }
+.r-big { font-size: 15px; }
+.r-line { border-top: 1px dashed #000; margin: 6px 0; }
+.r-row { display: flex; justify-content: space-between; gap: 8px; }
+.r-name { font-weight: 600; }
+
+@media print {
+  /* Hide everything except the receipt */
+  body * { visibility: hidden; }
+  #printArea, #printArea * { visibility: visible; }
+  #printArea {
+    display: block !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  @page {
+    size: 80mm auto; /* standard thermal roll width */
+    margin: 0;
+  }
+  body { margin: 0; }
+}
