@@ -1,22 +1,41 @@
 import os, json, sqlite3, datetime, requests
 from flask import Flask, request, jsonify, send_from_directory
+from werkzeug.exceptions import HTTPException
 from pypdf import PdfReader
 
 app = Flask(__name__, static_folder="static")
 KEY = os.environ.get("GROQ_API_KEY", "")
 MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
-SB = os.environ.get("SUPABASE_URL", "").rstrip("/")
-SBK = os.environ.get("SUPABASE_KEY", "")
-H = {"apikey": SBK, "Authorization": f"Bearer {SBK}", "Content-Type": "application/json"}
+def _env(n):
+    return os.environ.get(n, "").strip().strip("\"'").strip()
+
+
+SB = _env("SUPABASE_URL").rstrip("/")
+if SB.endswith("/rest/v1"):
+    SB = SB[:-8]
+SBK = _env("SUPABASE_KEY")
+H = {"apikey": SBK, "Content-Type": "application/json"}
+if SBK.startswith("eyJ"):  # old-style JWT keys (anon / service_role) also go in Authorization
+    H["Authorization"] = f"Bearer {SBK}"
+# new-style keys (sb_secret_... / sb_publishable_...) are NOT JWTs: send only the apikey header
 _l = sqlite3.connect(os.environ.get("DB_PATH", "prepmate.db"), check_same_thread=False)
 _l.execute("create table if not exists kv(k text primary key, v text)")
 
 
 # ---- storage: Supabase (table "kv") when configured, else local SQLite ----
+def _chk(r):
+    if r.ok:
+        return
+    hint = {401: "Supabase rejected the key. Re-copy SUPABASE_KEY (service_role / secret key) from Supabase > Project Settings > API, no quotes or spaces.",
+            403: "Key has no permission. Use the service_role / secret key, not the anon key.",
+            404: "Table 'kv' not found. Run supabase.sql in the Supabase SQL Editor."}.get(r.status_code, "")
+    raise RuntimeError(f"Supabase {r.status_code}: {hint} {r.text[:150]}")
+
+
 def kget(k, d=None):
     if SB:
         r = requests.get(f"{SB}/rest/v1/kv", headers=H, params={"k": f"eq.{k}", "select": "v"}, timeout=20)
-        r.raise_for_status()
+        _chk(r)
         j = r.json()
         return j[0]["v"] if j else d
     r = _l.execute("select v from kv where k=?", (k,)).fetchone()
@@ -25,8 +44,8 @@ def kget(k, d=None):
 
 def kset(k, v):
     if SB:
-        requests.post(f"{SB}/rest/v1/kv", headers={**H, "Prefer": "resolution=merge-duplicates"},
-                      params={"on_conflict": "k"}, json={"k": k, "v": v}, timeout=20).raise_for_status()
+        _chk(requests.post(f"{SB}/rest/v1/kv", headers={**H, "Prefer": "resolution=merge-duplicates"},
+                           params={"on_conflict": "k"}, json={"k": k, "v": v}, timeout=20))
         return
     _l.execute("insert or replace into kv values(?,?)", (k, json.dumps(v)))
     _l.commit()
@@ -89,12 +108,36 @@ def persona():
 
 @app.errorhandler(Exception)
 def err(e):
+    if isinstance(e, HTTPException):
+        return jsonify(error=e.description), e.code
     return jsonify(error=str(e)), 500
 
 
 @app.get("/")
 def home():
     return send_from_directory("static", "index.html")
+
+
+@app.get("/api/health")
+def health():
+    out = {"code_version": 3, "groq_key_set": bool(KEY), "model": MODEL,
+           "storage": "supabase" if SB else "local (progress resets on redeploy)"}
+    if SB:
+        out["supabase_host"] = SB.replace("https://", "")
+        out["key_style"] = ("jwt (eyJ...)" if SBK.startswith("eyJ") else "new (sb_...)" if SBK.startswith("sb_")
+                            else "UNKNOWN - check the key" if SBK else "MISSING")
+        try:
+            kget("health_check")
+            out["supabase_ok"] = True
+        except Exception as e:
+            out["supabase_ok"] = False
+            out["supabase_error"] = str(e)
+    return jsonify(out)
+
+
+@app.get("/favicon.ico")
+def fav():
+    return "", 204
 
 
 @app.get("/api/state")
