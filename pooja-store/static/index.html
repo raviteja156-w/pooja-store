@@ -1,0 +1,112 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1020"><title>PrepMate AI</title>
+<style>
+:root{--bg:#0b1020;--card:#141b34;--line:#25305a;--t:#eef1ff;--m:#9aa6d4;--a:#6c7bff;--b:#22d3ee;--g:#34d399;--r:#fb7185}
+*{box-sizing:border-box;margin:0}body{font:15px/1.55 system-ui,-apple-system,Segoe UI,sans-serif;background:radial-gradient(900px 500px at 80% -10%,#26307a55,transparent),var(--bg);color:var(--t);padding:env(safe-area-inset-top) 0 90px}
+main{max-width:720px;margin:auto;padding:16px}h1{font-size:22px}h2{font-size:18px;margin:6px 0 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin:12px 0;animation:up .5s both}
+.hero{background:linear-gradient(135deg,#4f5bff,#06b6d4);border:0;position:relative;overflow:hidden}
+.hero p{opacity:.9}.orb{position:absolute;right:-20px;top:-20px;width:130px;height:130px;border-radius:50%;background:#fff3;animation:float 5s ease-in-out infinite}
+.bot{width:64px;height:64px;animation:float 3s ease-in-out infinite}.bot .eye{animation:blink 4s infinite;transform-origin:center}
+button,.btn{background:linear-gradient(135deg,var(--a),var(--b));color:#fff;border:0;border-radius:12px;padding:11px 16px;font-weight:600;font-size:15px;cursor:pointer;margin:4px 4px 4px 0;transition:transform .15s}
+button:active{transform:scale(.95)}button.ghost{background:#1e2850;border:1px solid var(--line)}button:disabled{opacity:.5}
+input,textarea,select{width:100%;background:#0e1430;color:var(--t);border:1px solid var(--line);border-radius:12px;padding:11px;font:inherit;margin:5px 0}
+textarea{min-height:90px}nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#0d1330ee;backdrop-filter:blur(12px);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:9}
+nav a{flex:1;text-align:center;font-size:11px;color:var(--m);padding:4px;border-radius:10px;cursor:pointer}nav a svg{display:block;margin:0 auto 2px;width:24px;height:24px;transition:.3s}nav a.on{color:#fff}nav a.on svg{stroke:var(--b);transform:translateY(-3px) scale(1.15)}
+svg.i{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.row{display:flex;gap:10px;flex-wrap:wrap}.stat{flex:1;min-width:90px;text-align:center;background:#0e1430;border-radius:14px;padding:12px}.stat b{font-size:24px;display:block}
+.bar{height:8px;background:#0e1430;border-radius:9px;overflow:hidden;margin:4px 0 10px}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--a),var(--g));border-radius:9px;transition:width 1s}
+.timer{font-size:44px;font-weight:800;text-align:center;letter-spacing:2px}.md h1,.md h2,.md h3{margin:14px 0 6px;font-size:17px;color:var(--b)}.md pre{background:#0a0f26;padding:10px;border-radius:10px;overflow:auto;margin:8px 0;font-size:13px}.md code{color:#a5f3fc}.md li{margin-left:18px}
+.opt{display:block;width:100%;text-align:left;background:#0e1430;border:1px solid var(--line);margin:6px 0}.opt.ok{border-color:var(--g);background:#064e3b}.opt.no{border-color:var(--r);background:#4c0519}
+.mic{width:72px;height:72px;border-radius:50%;padding:0;display:block;margin:10px auto}.mic.rec{animation:pulse 1s infinite;background:var(--r)}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;background:#1e2850;color:var(--m);font-size:12px}.muted{color:var(--m)}.ld{text-align:center;padding:20px;color:var(--m)}.ld:before{content:"";display:block;width:34px;height:34px;margin:0 auto 8px;border:3px solid var(--line);border-top-color:var(--b);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes up{from{opacity:0;transform:translateY(14px)}}@keyframes float{50%{transform:translateY(-8px)}}@keyframes blink{0%,94%,100%{transform:scaleY(1)}97%{transform:scaleY(.1)}}@keyframes spin{to{transform:rotate(360deg)}}@keyframes pulse{50%{box-shadow:0 0 0 16px #fb718533}}
+
+.seg{display:flex;gap:8px;margin:4px 0 10px}.seg button{flex:1;margin:0}
+.th{display:flex;align-items:center;gap:12px}.th .em{font-size:34px;animation:float 3s ease-in-out infinite}.th small{color:var(--m)}
+.qa{background:var(--card);border:1px solid var(--line);border-radius:16px;margin:10px 0;overflow:hidden;animation:up .5s both;transition:border-color .3s}.qa.open{border-color:var(--a)}.qa.done{border-left:4px solid var(--g)}
+.qh{display:flex;gap:12px;padding:14px;cursor:pointer;align-items:flex-start}.qh b{display:block;margin-top:6px;font-size:15.5px;line-height:1.4}.qh>div{flex:1}
+.num{min-width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--a),var(--b));display:grid;place-items:center;font-weight:800;font-size:14px}
+.chev{transition:.3s;color:var(--m)}.qa.open .chev{transform:rotate(180deg)}.qb{display:none;padding:0 14px 14px;animation:up .3s both}.qa.open .qb{display:block}
+.t{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;margin:0 5px 3px 0}.hot{background:#7c2d12;color:#fdba74}.basic{background:#064e3b;color:#6ee7b7}.tricky{background:#4c1d95;color:#c4b5fd}.coding{background:#0c4a6e;color:#7dd3fc}.co{background:#1e2850;color:var(--m)}
+.lbl{font-size:11px;font-weight:800;letter-spacing:1px;color:var(--b);margin:12px 0 5px}.short{background:#0e1430;border-left:3px solid var(--g);padding:10px 12px;border-radius:10px}
+.qb ul{list-style:none;padding:0}.qb li{padding:5px 0 5px 22px;position:relative;margin-left:0}.qb li:before{content:"\25B8";position:absolute;left:4px;color:var(--a)}.qb ol{padding-left:22px}.qb ol li{padding-left:2px}.qb ol li:before{content:""}
+.mem{background:#422006;border:1px dashed #f59e0b;color:#fde68a;padding:10px 12px;border-radius:10px;margin-top:10px}.ansb{display:inline-block;background:var(--g);color:#022c22;font-weight:800;padding:5px 12px;border-radius:10px}
+.act{display:flex;gap:8px;margin-top:12px}.act button{flex:1}
+#fab{position:fixed;right:14px;bottom:86px;width:56px;height:56px;border-radius:50%;padding:0;font-size:26px;z-index:8;box-shadow:0 8px 24px #6c7bff66;animation:float 3s ease-in-out infinite}
+#bp{position:fixed;left:0;right:0;bottom:0;height:78vh;background:#0d1330;border-top:2px solid var(--a);border-radius:22px 22px 0 0;z-index:20;display:none;flex-direction:column;max-width:720px;margin:auto}#bp.on{display:flex;animation:up .3s both}
+.bh{padding:14px;font-weight:700;display:flex;justify-content:space-between;border-bottom:1px solid var(--line)}#bm{flex:1;overflow:auto;padding:12px}.bi{display:flex;gap:8px;padding:10px 10px calc(10px + env(safe-area-inset-bottom))}.bi input{margin:0}.bi button{margin:0}
+.m{max-width:88%;padding:10px 12px;border-radius:14px;margin:6px 0;font-size:14.5px}.m.user{background:var(--a);margin-left:auto}.m.assistant{background:#1a2347}
+</style></head><body><main id="app"></main>
+<button id="fab" onclick="bot()">🤖</button><div id="bp"><div class="bh">🤖 PrepMate Coach <span onclick="bot()" style="cursor:pointer">✕</span></div><div id="bm"></div><div class="bi"><input id="bx" placeholder="Ask any doubt..."><button id="bs">Send</button></div></div>
+<nav id="nav"></nav>
+<script>
+const $=s=>document.querySelector(s),app=$("#app");let S={},tab="home",tm=null;
+const I={home:'<path d="M3 11l9-8 9 8v10H3z"/>',learn:'<path d="M4 5h7a3 3 0 013 3v12a2 2 0 00-2-2H4zM20 5h-7a3 3 0 00-3 3"/>',test:'<path d="M9 11l3 3 8-8M4 4h10M4 10h3M4 16h8"/>',code:'<path d="M8 8l-5 4 5 4M16 8l5 4-5 4M14 4l-4 16"/>',me:'<path d="M12 3a4 4 0 100 8 4 4 0 000-8zM4 21a8 8 0 0116 0"/>'};
+const ico=n=>`<svg class="i" viewBox="0 0 24 24">${I[n]}</svg>`;
+const BOT=`<svg class="bot" viewBox="0 0 64 64"><rect x="10" y="16" width="44" height="36" rx="12" fill="#fff"/><rect x="26" y="6" width="12" height="8" rx="4" fill="#fff"/><g class="eye" fill="#4f5bff"><circle cx="24" cy="32" r="5"/><circle cx="40" cy="32" r="5"/></g><path d="M24 43q8 6 16 0" stroke="#4f5bff" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`;
+nav=[["home","Home"],["learn","Learn"],["test","Test"],["code","Code"],["me","Resume"]];
+$("#nav").innerHTML=nav.map(([k,l])=>`<a data-k="${k}">${ico(k=="me"?"me":k)}${l}</a>`).join("");
+$("#nav").onclick=e=>{const a=e.target.closest("a");if(a)go(a.dataset.k)};
+const api=async(p,b,f)=>{const r=await fetch("/api/"+p,b===undefined?{}:f?{method:"POST",body:b}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});const j=await r.json();if(j.error)throw new Error(j.error);return j};
+const ld=t=>`<div class="ld">${t||"Your coach is thinking..."}</div>`;
+const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
+const md=t=>esc(t).replace(/```\w*\n([\s\S]*?)```/g,"<pre><code>$1</code></pre>").replace(/^### (.*)$/gm,"<h3>$1</h3>").replace(/^## (.*)$/gm,"<h2>$1</h2>").replace(/^# (.*)$/gm,"<h1>$1</h1>").replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`([^`]+)`/g,"<code>$1</code>").replace(/^[-*] (.*)$/gm,"<li>$1</li>").replace(/\n/g,"<br>");
+async function load(){S=await api("state")}
+async function go(t){tab=t;clearInterval(tm);document.querySelectorAll("nav a").forEach(a=>a.classList.toggle("on",a.dataset.k==t));await load();if(!S.profile&&t!="me")return onboard();({home,learn,test,code,me})[t]()}
+function onboard(){app.innerHTML=`<div class="card hero"><div class="orb"></div>${BOT}<h1>Hi! I'm PrepMate</h1><p>Tell me about you so I can teach the way you learn.</p></div><div class="card"><input id="n" placeholder="Your name"><input id="r" placeholder="Target role (e.g. Gen AI Engineer)" value="Gen AI Engineer"><select id="l"><option>Fresher</option><option>1-2 years</option><option>3+ years</option></select><textarea id="m" placeholder="How do you learn best & how do you feel about interviews? (e.g. I get nervous, I like examples, short explanations...)"></textarea><button id="sv">Start my journey</button></div>`;
+$("#sv").onclick=async()=>{await api("profile",{name:$("#n").value,role:$("#r").value,level:$("#l").value,mindset:$("#m").value});go("home")}}
+function home(){const p=S.profile,d=S.today||[],done=k=>d.some(x=>x.kind==k),n=d.filter(x=>x.kind=="code").length;
+const m=Object.entries(S.mastery||{});
+app.innerHTML=`<div class="card hero"><div class="orb"></div>${BOT}<h1>Hello ${esc(p.name||"")}, you've got this!</h1><p>Small steps daily build interview confidence.</p></div>
+<div class="row"><div class="stat"><b>${S.streak}</b>day streak</div><div class="stat"><b>${d.length}</b>done today</div><div class="stat"><b>${m.length}</b>topics</div></div>
+<div class="card"><h2>Today's plan</h2><p>${done("revision")?"✅":"⬜"} 30-min revision</p><p>${done("quiz")||done("define")?"✅":"⬜"} 15-min test (quiz + voice)</p><p>${n>=5?"✅":"⬜"} Coding ${n}/5</p><button onclick="go('learn')">Start</button></div>
+<div class="card"><h2>Your tasks</h2>${(S.tasks||[]).map(t=>`<p>${t.done?"✅":"📌"} <a style="color:var(--b)" href="${t.url}" target="_blank" rel="noopener" onclick="visited(${t.id},'${esc(t.topic).replace(/'/g,"")}')">${esc(t.title)}</a> <span class="pill">${esc(t.topic)}</span></p>`).join("")||'<p class="muted">No tasks yet.</p>'}<button class="ghost" id="tk">Get new tasks from AI</button><div id="tq"></div></div>
+<div class="card"><h2>Topic mastery</h2>${m.map(([t,v])=>`<small>${esc(t)} ${v}%</small><div class="bar"><i style="width:${v}%"></i></div>`).join("")||'<p class="muted">Take a test to see progress.</p>'}</div>`;
+$("#tk").onclick=async e=>{e.target.disabled=1;e.target.textContent="Generating...";await api("tasks",{});go("home")}}
+async function visited(id,topic){setTimeout(()=>{$("#tq").innerHTML=`<div class="card">Done reading? <button onclick="finishTask(${id},'${topic}')">Test me on it</button></div>`},1500)}
+async function finishTask(id,topic){await api("task_done",{id});quizOn(topic)}
+let LT="tech",CH=[],CTX="",B=[];
+const TC={"Most Asked":"hot","Basic":"basic","Tricky":"tricky","Coding":"coding"};
+const tags=c=>`<span class="t ${TC[c.tag]||"basic"}">${c.tag=="Most Asked"?"\u{1F525} ":""}${esc(c.tag||"Basic")}</span>`+(c.companies||[]).map(x=>`<span class="t co">${esc(x)}</span>`).join("");
+const head=(r,ico)=>`<div class="card th"><div class="em">${ico}</div><div><small>DAY ${S.day}${r.level?" · "+r.level.toUpperCase():""}</small><h2 style="margin:0">${esc(r.topic)}</h2><small>${r.cards.length} most-asked questions · tap to open</small></div></div><div class="card" style="padding:12px"><div class="row" style="align-items:center"><b id="tt" style="font-size:22px">30:00</b><button id="st" class="ghost" style="margin-left:auto">⏱ Start 30-min revision</button></div><div class="bar" style="margin:8px 0 0"><i id="tb" style="width:0"></i></div></div>`;
+async function learn(){
+ app.innerHTML=`<div class="seg"><button id="s1" class="${LT=="tech"?"":"ghost"}">\u{1F4BC} Interview Q&A</button><button id="s2" class="${LT=="apt"?"":"ghost"}">\u{1F9EE} Aptitude</button></div><div id="o">${ld("Preparing today's cards...")}</div>`;
+ $("#s1").onclick=()=>{LT="tech";clearInterval(tm);learn()};$("#s2").onclick=()=>{LT="apt";clearInterval(tm);learn()};
+ try{const r=await api(LT=="tech"?"learn":"aptitude",{});CH=r.cards;const ap=LT=="apt";
+ $("#o").innerHTML=head(r,ap?"\u{1F9EE}":"\u{1F4A1}")+(ap&&r.formulas?`<div class="card"><div class="lbl" style="margin-top:0">\u{1F4D0} KEY FORMULAS</div><ul class="qb" style="display:block;padding:0">${r.formulas.map(f=>`<li>${esc(f)}</li>`).join("")}</ul></div>`:"")+
+ r.cards.map((c,i)=>`<div class="qa" id="k${i}"><div class="qh" onclick="this.parentNode.classList.toggle('open')"><span class="num">${i+1}</span><div><div>${tags(c)}</div><b>${esc(c.q)}</b></div><span class="chev">⌄</span></div><div class="qb">`+
+ (ap?`<div class="lbl">\u{1FA9C} SOLUTION</div><ol>${(c.steps||[]).map(x=>`<li>${esc(String(x))}</li>`).join("")}</ol><div class="lbl">\u{1F3AF} ANSWER</div><span class="ansb">${esc(String(c.answer))}</span><div class="mem">⚡ Shortcut: ${esc(String(c.trick||""))}</div>`
+ :`<div class="lbl">✅ ANSWER</div><div class="short">${esc(String(c.short))}</div><div class="lbl">\u{1F4CC} KEY POINTS</div><ul>${(c.points||[]).map(x=>`<li>${esc(String(x))}</li>`).join("")}</ul><div class="mem">\u{1F9E0} Remember: ${esc(String(c.memory||""))}</div>${c.example?`<div class="lbl">\u{1F4BB} EXAMPLE</div><pre class="md"><code>${esc(String(c.example))}</code></pre>`:""}`)+
+ `<div class="act"><button class="ghost" onclick="askBot(${i})">\u{1F916} Ask AI</button><button onclick="got(${i})">Got it ✓</button></div></div></div>`).join("")+
+ `<div class="card"><button id="pq">\u{1F4DD} Practice quiz</button><button class="ghost" id="fin">Finish revision ✔</button></div>`;
+ const qt=(ap?"Aptitude: ":"")+r.topic+(ap?" ("+r.level+")":"");
+ $("#pq").onclick=()=>quizOn(qt);
+ $("#st").onclick=()=>{clearInterval(tm);let s=1800;tm=setInterval(()=>{s--;if(s<0)return clearInterval(tm);$("#tt").textContent=String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");$("#tb").style.width=(100-s/18)+"%"},1000);$("#st").textContent="Running..."};
+ $("#fin").onclick=async()=>{await api("result",{kind:"revision",topic:r.topic,score:1,total:1});clearInterval(tm);alert("Great job! Now take the practice quiz.")}}
+ catch(e){$("#o").innerHTML=`<div class="card">⚠️ ${esc(e.message)}</div>`}}
+function got(i){const k=$("#k"+i);k.classList.add("done");k.classList.remove("open");const n=$("#k"+(i+1));if(n){n.classList.add("open");n.scrollIntoView({behavior:"smooth",block:"center"})}}
+function bot(){$("#bp").classList.toggle("on");if(!B.length)say("assistant","Hi! I'm your coach \u{1F44B} Ask any doubt - I'll explain simply.")}
+function say(role,t){if(t)B.push({role,content:t});$("#bm").innerHTML=B.map(m=>`<div class="m ${m.role}">${md(m.content)}</div>`).join("");$("#bm").scrollTop=1e9}
+async function send(t){t=t||$("#bx").value.trim();if(!t)return;$("#bx").value="";say("user",t);$("#bm").insertAdjacentHTML("beforeend",'<div class="m assistant">Thinking...</div>');try{const r=await api("chat",{messages:B.slice(-10),context:CTX});say("assistant",r.text)}catch(e){say("assistant","⚠️ "+e.message)}}
+$("#bs").onclick=()=>send();$("#bx").onkeydown=e=>{if(e.key=="Enter")send()};
+function askBot(i){CTX=JSON.stringify(CH[i]);if(!$("#bp").classList.contains("on"))bot();send("Explain this question in simple words with an easy example: "+CH[i].q)}
+function test(){app.innerHTML=`<div class="card"><h2>15-min test</h2><button onclick="quizOn('')">📝 Quiz</button><button class="ghost" onclick="voice()">🎤 Define on mic</button></div><div id="o"></div>`}
+async function quizOn(topic){tab="test";document.querySelectorAll("nav a").forEach(a=>a.classList.toggle("on",a.dataset.k=="test"));app.innerHTML=ld("Preparing your quiz...");try{const q=await api("quiz",{topic});let i=0,sc=0;
+const show=()=>{if(i>=q.questions.length){api("result",{kind:"quiz",topic:topic||q.topic||"general",score:sc,total:q.questions.length});app.innerHTML=`<div class="card hero"><h1>Score ${sc}/${q.questions.length} 🎉</h1><p>${sc>=4?"Excellent confidence!":"Every miss is progress. Revise and retry."}</p></div><button onclick="go('test')">Back</button><button class="ghost" onclick="go('home')">Home</button>`;return}
+const x=q.questions[i];app.innerHTML=`<div class="card"><span class="pill">Q${i+1}/${q.questions.length}</span><h2>${esc(x.q)}</h2>${x.options.map((o,j)=>`<button class="opt" data-j="${j}">${esc(o)}</button>`).join("")}<p id="w" class="muted"></p></div>`;
+document.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{const j=+b.dataset.j;document.querySelectorAll(".opt").forEach(o=>o.disabled=1);document.querySelectorAll(".opt")[x.answer].classList.add("ok");if(j==x.answer)sc++;else b.classList.add("no");$("#w").innerHTML=esc(x.why)+'<br><button id="nx">Next</button>';$("#nx").onclick=()=>{i++;show()}})};show()}catch(e){app.innerHTML=`<div class="card">⚠️ ${esc(e.message)}</div>`}}
+async function voice(){app.innerHTML=ld();try{const {terms}=await api("term",{});let i=0;const next=()=>{if(i>=terms.length)return go("test");const t=terms[i];
+app.innerHTML=`<div class="card"><span class="pill">Term ${i+1}/${terms.length}</span><h2>Define: ${esc(t)}</h2><button class="mic" id="mic">${ico("test").replace("<svg","<svg width=30 height=30")}🎤</button><textarea id="a" placeholder="Tap mic and speak, or type..."></textarea><button id="sb">Check my answer</button><div id="f"></div></div>`;
+const R=window.SpeechRecognition||window.webkitSpeechRecognition;let rec;$("#mic").onclick=()=>{if(!R)return alert("Voice not supported in this browser. Use Chrome.");if(rec){rec.stop();return}rec=new R();rec.lang="en-IN";rec.continuous=true;rec.interimResults=true;rec.onresult=e=>{$("#a").value=[...e.results].map(r=>r[0].transcript).join(" ")};rec.onend=()=>{rec=null;$("#mic").classList.remove("rec")};rec.start();$("#mic").classList.add("rec")};
+$("#sb").onclick=async()=>{$("#f").innerHTML=ld();const r=await api("define",{term:t,answer:$("#a").value});await api("result",{kind:"define",topic:t,score:r.score,total:10});
+$("#f").innerHTML=`<h2>${r.score}/10</h2><p>✅ ${esc(r.correct_points)}</p><p>➕ ${esc(r.missing)}</p><div class="card md"><b>Grammar-fixed</b><br>${esc(r.grammar_fixed)}<br><small class="muted">${esc(String(r.grammar_notes))}</small></div><div class="card md"><b>Model answer</b><br>${esc(r.model_answer)}</div><button id="nt">Next</button>`;$("#nt").onclick=()=>{i++;next()}};};next()}catch(e){app.innerHTML=`<div class="card">⚠️ ${esc(e.message)}</div>`}}
+async function code(){app.innerHTML=ld("Loading today's 5 problems...");try{const {problems}=await api("coding",{});const n=(S.today||[]).filter(x=>x.kind=="code").length;
+app.innerHTML=`<div class="card"><h2>Daily coding ${n}/5</h2><p class="muted">Write Python, get reviewed instantly.</p></div>`+problems.map((p,i)=>`<div class="card"><span class="pill">#${i+1}</span><h2>${esc(p.title)}</h2><p>${esc(p.statement)}</p><pre class="md"><code>${esc(p.example||"")}</code></pre><details><summary class="muted">Hint</summary>${esc(p.hint||"")}</details><textarea id="c${i}" spellcheck="false" placeholder="def solve(...):"></textarea><button data-i="${i}">Review my code</button><div id="r${i}"></div></div>`).join("");
+document.querySelectorAll("button[data-i]").forEach(b=>b.onclick=async()=>{const i=b.dataset.i,p=problems[i];$("#r"+i).innerHTML=ld();const r=await api("review",{problem:p.title+": "+p.statement,code:$("#c"+i).value});await api("result",{kind:"code",topic:"coding",score:r.score,total:10});
+$("#r"+i).innerHTML=`<h2>${r.correct?"✅":"🔧"} ${r.score}/10</h2><div class="md">${md(String(r.feedback))}<br><b>Complexity:</b> ${esc(String(r.complexity))}<pre><code>${esc(String(r.better_solution))}</code></pre></div>`})}catch(e){app.innerHTML=`<div class="card">⚠️ ${esc(e.message)}</div>`}}
+function me(){app.innerHTML=`<div class="card"><h2>Resume analysis</h2><p class="muted">Upload PDF or TXT. AI finds gaps and predicts interview questions.</p><input type="file" id="f" accept=".pdf,.txt"><button id="up">Analyse me</button></div><div id="o"></div><div class="card"><button class="ghost" id="rp">Edit my profile</button></div>`;
+$("#up").onclick=async()=>{const f=$("#f").files[0];if(!f)return;$("#o").innerHTML=ld("Reading your resume...");const fd=new FormData();fd.append("file",f);try{const r=await api("resume",fd,1);$("#o").innerHTML=`<div class="card md">${md(r.text)}</div>`}catch(e){$("#o").innerHTML=`<div class="card">⚠️ ${esc(e.message)}</div>`}};$("#rp").onclick=onboard}
+go("home");
+</script></body></html>

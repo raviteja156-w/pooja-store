@@ -1,272 +1,283 @@
-import os
-import sqlite3
-from datetime import datetime
-from flask import Flask, g, render_template, request, jsonify
+import os, json, sqlite3, datetime, requests
+from flask import Flask, request, jsonify, send_from_directory
+from pypdf import PdfReader
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "store.db")
-
-app = Flask(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Database helpers
-# ---------------------------------------------------------------------------
-def get_db():
-    if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH)
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("PRAGMA foreign_keys = ON")
-    return g.db
+app = Flask(__name__, static_folder="static")
+KEY = os.environ.get("GROQ_API_KEY", "")
+MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+SB = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SBK = os.environ.get("SUPABASE_KEY", "")
+H = {"apikey": SBK, "Authorization": f"Bearer {SBK}", "Content-Type": "application/json"}
+_l = sqlite3.connect(os.environ.get("DB_PATH", "prepmate.db"), check_same_thread=False)
+_l.execute("create table if not exists kv(k text primary key, v text)")
 
 
-@app.teardown_appcontext
-def close_db(exception=None):
-    db = g.pop("db", None)
-    if db is not None:
-        db.close()
+# ---- storage: Supabase (table "kv") when configured, else local SQLite ----
+def kget(k, d=None):
+    if SB:
+        r = requests.get(f"{SB}/rest/v1/kv", headers=H, params={"k": f"eq.{k}", "select": "v"}, timeout=20)
+        r.raise_for_status()
+        j = r.json()
+        return j[0]["v"] if j else d
+    r = _l.execute("select v from kv where k=?", (k,)).fetchone()
+    return json.loads(r[0]) if r else d
 
 
-def init_db():
-    db = sqlite3.connect(DB_PATH)
-    db.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            price REAL NOT NULL,
-            category TEXT DEFAULT '',
-            stock REAL DEFAULT 0,
-            unit TEXT DEFAULT 'pc',
-            created_at TEXT DEFAULT (datetime('now'))
-        );
-
-        CREATE TABLE IF NOT EXISTS invoices (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            invoice_no TEXT NOT NULL UNIQUE,
-            customer_name TEXT DEFAULT '',
-            subtotal REAL NOT NULL,
-            discount REAL DEFAULT 0,
-            total REAL NOT NULL,
-            payment_mode TEXT DEFAULT 'Cash',
-            created_at TEXT DEFAULT (datetime('now'))
-        );
-
-        CREATE TABLE IF NOT EXISTS invoice_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            invoice_id INTEGER NOT NULL,
-            item_name TEXT NOT NULL,
-            price REAL NOT NULL,
-            qty REAL NOT NULL,
-            line_total REAL NOT NULL,
-            FOREIGN KEY (invoice_id) REFERENCES invoices (id)
-        );
-        """
-    )
-    # seed a few demo items only if table is empty
-    cur = db.execute("SELECT COUNT(*) FROM items")
-    if cur.fetchone()[0] == 0:
-        demo_items = [
-            ("Rice (1kg)", 60, "Grocery", 50, "kg"),
-            ("Wheat Flour (1kg)", 45, "Grocery", 50, "kg"),
-            ("Sugar (1kg)", 42, "Grocery", 40, "kg"),
-            ("Tea Powder (250g)", 90, "Grocery", 30, "pkt"),
-            ("Cooking Oil (1L)", 150, "Grocery", 20, "ltr"),
-            ("Soap", 35, "Personal Care", 100, "pc"),
-            ("Shampoo Sachet", 5, "Personal Care", 200, "pc"),
-            ("Biscuit Packet", 20, "Snacks", 80, "pkt"),
-            ("Milk (500ml)", 28, "Dairy", 60, "pkt"),
-            ("Notebook", 40, "Stationery", 50, "pc"),
-        ]
-        db.executemany(
-            "INSERT INTO items (name, price, category, stock, unit) VALUES (?,?,?,?,?)",
-            demo_items,
-        )
-    db.commit()
-    db.close()
+def kset(k, v):
+    if SB:
+        requests.post(f"{SB}/rest/v1/kv", headers={**H, "Prefer": "resolution=merge-duplicates"},
+                      params={"on_conflict": "k"}, json={"k": k, "v": v}, timeout=20).raise_for_status()
+        return
+    _l.execute("insert or replace into kv values(?,?)", (k, json.dumps(v)))
+    _l.commit()
 
 
-# ---------------------------------------------------------------------------
-# Pages
-# ---------------------------------------------------------------------------
-@app.route("/")
-def billing_page():
-    return render_template("billing.html")
+def ai(system, user, as_json=False, msgs=None):
+    if not KEY:
+        raise RuntimeError("GROQ_API_KEY not set on server")
+    m = [{"role": "system", "content": system}] + (msgs or [{"role": "user", "content": user}])
+    body = {"model": MODEL, "temperature": 0.6, "messages": m}
+    if as_json:
+        body["response_format"] = {"type": "json_object"}
+    r = requests.post("https://api.groq.com/openai/v1/chat/completions",
+                      headers={"Authorization": f"Bearer {KEY}"}, json=body, timeout=120)
+    if not r.ok:
+        raise RuntimeError(f"Groq {r.status_code}: {r.text[:200]}")
+    t = r.json()["choices"][0]["message"]["content"]
+    return json.loads(t) if as_json else t
 
 
-@app.route("/items")
-def items_page():
-    return render_template("items.html")
+TECH = ["Python Core", "Python OOP & Advanced", "SQL & Databases", "Statistics & Probability", "Machine Learning Basics",
+        "Deep Learning & Transformers", "LLMs & Prompt Engineering", "RAG & Vector Databases", "AI Agents & LangChain",
+        "Flask/FastAPI & REST APIs", "Pandas & NumPy", "DSA: Arrays & Strings", "DSA: Hashing, Stack & Queue",
+        "System Design Basics", "HR & Behavioural"]
+APT = {"beginner": ["Percentages", "Ratio & Proportion", "Averages", "Profit & Loss", "Simple & Compound Interest",
+                    "Time & Work", "Time Speed Distance", "Number Series"],
+       "intermediate": ["Permutation & Combination", "Probability", "Mixtures & Alligation", "Pipes & Cisterns",
+                        "Boats & Streams", "Logical Reasoning", "Data Interpretation", "Syllogisms"],
+       "pro": ["Advanced Probability", "Geometry & Mensuration", "Seating Arrangement",
+               "Blood Relations & Coding-Decoding", "Puzzles", "Tricky Mixed Quant", "Verbal Reasoning",
+               "Data Sufficiency"]}
+LV = ["beginner", "intermediate", "pro"]
+CO = "TCS, Infosys, Wipro, Cognizant, Accenture, Capgemini, Deloitte, Amazon, Google, startups"
 
 
-# ---------------------------------------------------------------------------
-# Items CRUD API
-# ---------------------------------------------------------------------------
-@app.route("/api/items", methods=["GET"])
-def api_items_list():
-    db = get_db()
-    q = request.args.get("q", "").strip()
-    if q:
-        rows = db.execute(
-            "SELECT * FROM items WHERE name LIKE ? OR category LIKE ? ORDER BY name",
-            (f"%{q}%", f"%{q}%"),
-        ).fetchall()
-    else:
-        rows = db.execute("SELECT * FROM items ORDER BY name").fetchall()
-    return jsonify([dict(r) for r in rows])
+def today():
+    return datetime.date.today().isoformat()
 
 
-@app.route("/api/items", methods=["POST"])
-def api_items_create():
-    data = request.get_json(force=True)
-    name = (data.get("name") or "").strip()
-    price = data.get("price")
-    category = (data.get("category") or "").strip()
-    stock = data.get("stock", 0)
-    unit = (data.get("unit") or "pc").strip()
-
-    if not name or price is None:
-        return jsonify({"error": "Name and price are required"}), 400
-    try:
-        price = float(price)
-        stock = float(stock) if stock not in (None, "") else 0
-    except ValueError:
-        return jsonify({"error": "Price and stock must be numbers"}), 400
-
-    db = get_db()
-    cur = db.execute(
-        "INSERT INTO items (name, price, category, stock, unit) VALUES (?,?,?,?,?)",
-        (name, price, category, stock, unit),
-    )
-    db.commit()
-    new_item = db.execute("SELECT * FROM items WHERE id=?", (cur.lastrowid,)).fetchone()
-    return jsonify(dict(new_item)), 201
+def day_no():
+    s = kget("start")
+    if not s:
+        s = today()
+        kset("start", s)
+    return (datetime.date.today() - datetime.date.fromisoformat(s)).days
 
 
-@app.route("/api/items/<int:item_id>", methods=["PUT"])
-def api_items_update(item_id):
-    data = request.get_json(force=True)
-    db = get_db()
-    existing = db.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
-    if not existing:
-        return jsonify({"error": "Item not found"}), 404
-
-    name = (data.get("name") or existing["name"]).strip()
-    category = data.get("category", existing["category"])
-    unit = data.get("unit", existing["unit"])
-    try:
-        price = float(data.get("price", existing["price"]))
-        stock = float(data.get("stock", existing["stock"]))
-    except ValueError:
-        return jsonify({"error": "Price and stock must be numbers"}), 400
-
-    db.execute(
-        "UPDATE items SET name=?, price=?, category=?, stock=?, unit=? WHERE id=?",
-        (name, price, category, stock, unit, item_id),
-    )
-    db.commit()
-    updated = db.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
-    return jsonify(dict(updated))
+def persona():
+    p = kget("profile", {}) or {}
+    res = kget("results", [])
+    t = {}
+    for r in res:
+        if r["total"]:
+            t.setdefault(r["topic"], []).append(r["score"] / r["total"])
+    weak = sorted(t, key=lambda x: sum(t[x]) / len(t[x]))[:3]
+    return (f"Learner: {p.get('name', '')}, target role: {p.get('role', '')}, level: {p.get('level', '')}, "
+            f"mindset: {p.get('mindset', '')}. Python/full-stack strong; fresh Gen AI, agentic AI & data science "
+            f"graduate. Weak topics: {weak or 'unknown'}. Use very simple English, short lines, be encouraging.")
 
 
-@app.route("/api/items/<int:item_id>", methods=["DELETE"])
-def api_items_delete(item_id):
-    db = get_db()
-    existing = db.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
-    if not existing:
-        return jsonify({"error": "Item not found"}), 404
-    db.execute("DELETE FROM items WHERE id=?", (item_id,))
-    db.commit()
-    return jsonify({"ok": True})
+@app.errorhandler(Exception)
+def err(e):
+    return jsonify(error=str(e)), 500
 
 
-# ---------------------------------------------------------------------------
-# Billing API
-# ---------------------------------------------------------------------------
-def generate_invoice_no(db):
-    today = datetime.now().strftime("%Y%m%d")
-    row = db.execute(
-        "SELECT COUNT(*) as c FROM invoices WHERE invoice_no LIKE ?", (f"PS-{today}-%",)
-    ).fetchone()
-    seq = row["c"] + 1
-    return f"PS-{today}-{seq:03d}"
+@app.get("/")
+def home():
+    return send_from_directory("static", "index.html")
 
 
-@app.route("/api/billing/generate", methods=["POST"])
-def api_billing_generate():
-    data = request.get_json(force=True)
-    cart = data.get("cart", [])
-    customer_name = (data.get("customer_name") or "").strip()
-    discount = float(data.get("discount") or 0)
-    payment_mode = data.get("payment_mode") or "Cash"
-
-    if not cart:
-        return jsonify({"error": "Cart is empty"}), 400
-
-    db = get_db()
-    subtotal = 0.0
-    line_items = []
-    for line in cart:
-        try:
-            item_id = int(line.get("id"))
-            qty = float(line.get("qty"))
-        except (TypeError, ValueError):
-            return jsonify({"error": "Invalid cart line"}), 400
-        item = db.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
-        if not item:
-            continue
-        if qty <= 0:
-            continue
-        line_total = round(item["price"] * qty, 2)
-        subtotal += line_total
-        line_items.append(
-            {
-                "item_name": item["name"],
-                "price": item["price"],
-                "qty": qty,
-                "unit": item["unit"],
-                "line_total": line_total,
-            }
-        )
-
-    if not line_items:
-        return jsonify({"error": "No valid items in cart"}), 400
-
-    subtotal = round(subtotal, 2)
-    discount = max(0.0, min(discount, subtotal))
-    total = round(subtotal - discount, 2)
-
-    invoice_no = generate_invoice_no(db)
-    cur = db.execute(
-        "INSERT INTO invoices (invoice_no, customer_name, subtotal, discount, total, payment_mode) VALUES (?,?,?,?,?,?)",
-        (invoice_no, customer_name, subtotal, discount, total, payment_mode),
-    )
-    invoice_id = cur.lastrowid
-    for li in line_items:
-        db.execute(
-            "INSERT INTO invoice_items (invoice_id, item_name, price, qty, line_total) VALUES (?,?,?,?,?)",
-            (invoice_id, li["item_name"], li["price"], li["qty"], li["line_total"]),
-        )
-    db.commit()
-
-    return jsonify(
-        {
-            "invoice_no": invoice_no,
-            "customer_name": customer_name,
-            "created_at": datetime.now().strftime("%d-%m-%Y %I:%M %p"),
-            "items": line_items,
-            "subtotal": subtotal,
-            "discount": discount,
-            "total": total,
-            "payment_mode": payment_mode,
-            "store_name": "POOJA STORE",
-        }
-    )
+@app.get("/api/state")
+def state():
+    res = kget("results", [])
+    td = today()
+    days = {r["ts"][:10] for r in res}
+    streak, d = 0, datetime.date.today()
+    while d.isoformat() in days:
+        streak += 1
+        d -= datetime.timedelta(days=1)
+    t = {}
+    for r in res:
+        if r["total"]:
+            t.setdefault(r["topic"], []).append(r["score"] / r["total"])
+    n = day_no()
+    lv = kget("apt_level", "beginner")
+    return jsonify(profile=kget("profile"), streak=streak,
+                   mastery={k: round(100 * sum(v) / len(v)) for k, v in t.items()},
+                   tasks=sorted(kget("tasks", []), key=lambda x: x["done"])[:15],
+                   today=[r for r in res if r["ts"].startswith(td)],
+                   day=n + 1, tech=TECH[n % len(TECH)], apt=APT[lv][n % 8], level=lv)
 
 
-# ---------------------------------------------------------------------------
-init_db()
+@app.post("/api/profile")
+def profile():
+    kset("profile", request.json)
+    return jsonify(ok=1)
+
+
+@app.post("/api/result")
+def result():
+    j = request.json
+    res = kget("results", [])
+    res.append({"ts": datetime.datetime.now().isoformat(), "kind": j["kind"], "topic": j.get("topic", "general"),
+                "score": j["score"], "total": j["total"]})
+    kset("results", res[-400:])
+    # aptitude auto level: 80%+ -> level up, 20% or less -> level down
+    if j["kind"] == "quiz" and str(j.get("topic", "")).startswith("Aptitude") and j["total"]:
+        lv = kget("apt_level", "beginner")
+        i = LV.index(lv)
+        r = j["score"] / j["total"]
+        if r >= .8 and i < 2:
+            kset("apt_level", LV[i + 1])
+        elif r <= .2 and i > 0:
+            kset("apt_level", LV[i - 1])
+    return jsonify(ok=1)
+
+
+@app.post("/api/learn")
+def learn():
+    n = day_no()
+    topic = TECH[n % len(TECH)]
+    k = f"learn_{today()}"
+    c = kget(k)
+    if c:
+        return jsonify(c)
+    j = ai("Return JSON only. You are a top interview coach. " + persona(),
+           f'Topic: "{topic}". Create 8 MOST-ASKED interview questions on it, as asked by MNCs and companies like {CO} '
+           'for Gen AI / Data Science / Python roles, ordered easy to hard. Each answer must be easy to memorize: '
+           'NO paragraphs. Format: {"cards":[{"q":"..","tag":"Most Asked|Basic|Tricky|Coding",'
+           '"companies":["TCS","Infosys"],"short":"1-2 line answer in simple words",'
+           '"points":["3 to 4 crisp bullet points"],"memory":"one mnemonic or memory trick",'
+           '"example":"tiny code or real-life example, or empty"}]}', True)
+    j["topic"] = topic
+    j["day"] = n + 1
+    kset(k, j)
+    return jsonify(j)
+
+
+@app.post("/api/aptitude")
+def aptitude():
+    n = day_no()
+    lv = kget("apt_level", "beginner")
+    topic = APT[lv][n % 8]
+    k = f"apt_{today()}_{lv}"
+    c = kget(k)
+    if c:
+        return jsonify(c)
+    j = ai("Return JSON only. You are an aptitude trainer for campus/MNC hiring tests (TCS NQT, Infosys, Wipro, "
+           "Cognizant, Accenture, CAT-style). " + persona(),
+           f'Level: {lv}. Topic: "{topic}". Give key formulas then 6 most-asked questions with solutions, easy to hard '
+           'for this level. Format: {"formulas":["short formula or rule",".."],"cards":[{"q":"..",'
+           '"tag":"Basic|Most Asked|Tricky","companies":["TCS"],"steps":["step 1","step 2","step 3"],'
+           '"answer":"final answer","trick":"shortcut to solve in 10 seconds"}]}', True)
+    j["topic"] = topic
+    j["level"] = lv
+    kset(k, j)
+    return jsonify(j)
+
+
+@app.post("/api/chat")
+def chat():
+    j = request.json
+    sys = ("You are PrepMate, a friendly interview + aptitude coach inside a mobile app. Answer in very simple English, "
+           "short bullets, max 120 words, give a memory trick or example when useful, use code blocks only if needed. "
+           + persona() +
+           (f"\nCurrent card the learner is viewing: {j.get('context', '')[:1500]}" if j.get("context") else ""))
+    return jsonify(text=ai(sys, "", msgs=[{"role": m["role"], "content": m["content"]} for m in j["messages"]]))
+
+
+@app.post("/api/quiz")
+def quiz():
+    topic = (request.json or {}).get("topic", "")
+    return jsonify(ai("Return JSON only. " + persona(),
+                      f'Make 5 MCQs on {topic or "the learner weakest topics"}, most-asked interview/aptitude style. '
+                      'Format: {"questions":[{"q":"..","options":["A","B","C","D"],"answer":0,"why":"short solution"}]}',
+                      True))
+
+
+@app.post("/api/term")
+def term():
+    topic = (request.json or {}).get("topic", "")
+    return jsonify(ai("Return JSON only. " + persona(),
+                      f'Give 3 interview terms to define aloud{" on " + topic if topic else ""}. '
+                      'Format: {"terms":["..","..",".."]}', True))
+
+
+@app.post("/api/define")
+def define():
+    j = request.json
+    return jsonify(ai("Return JSON only. You are an interview coach and English tutor. " + persona(),
+                      f'Term: {j["term"]}\nSpoken answer: {j["answer"]}\nFormat: {{"score":0-10,"correct_points":"..",'
+                      '"missing":"..","grammar_fixed":"corrected fluent professional version",'
+                      '"grammar_notes":"short mistakes list","model_answer":"ideal 2-3 sentence answer"}', True))
+
+
+@app.post("/api/coding")
+def coding():
+    k = "coding_" + today()
+    c = kget(k)
+    if c:
+        return jsonify(c)
+    j = ai("Return JSON only. " + persona(),
+           'Make 5 most-asked Python interview coding problems (easy to medium: arrays/strings, dict/hash, '
+           'pandas/numpy, OOP, one AI-flavoured). Format: {"problems":[{"title":"..","statement":"..",'
+           '"example":"..","hint":".."}]}', True)
+    kset(k, j)
+    return jsonify(j)
+
+
+@app.post("/api/review")
+def review():
+    j = request.json
+    return jsonify(ai("Return JSON only. You are a senior Python interviewer. " + persona(),
+                      f'Problem: {j["problem"]}\nCandidate code:\n{j["code"]}\nFormat: {{"correct":true,"score":0-10,'
+                      '"feedback":"..","better_solution":"python code","complexity":".."}', True))
+
+
+@app.post("/api/tasks")
+def mktasks():
+    j = ai("Return JSON only. " + persona(),
+           'Assign 3 learning tasks for weak/next topics with a free resource (official docs, freeCodeCamp, YouTube, '
+           'Hugging Face course). Format: {"tasks":[{"topic":"..","title":"..","url":"https://.."}]}', True)
+    ts = kget("tasks", [])
+    i = max([t["id"] for t in ts] or [0])
+    for t in j["tasks"]:
+        i += 1
+        ts.append({"id": i, "topic": t["topic"], "title": t["title"], "url": t["url"], "done": 0})
+    kset("tasks", ts[-30:])
+    return jsonify(ok=1)
+
+
+@app.post("/api/task_done")
+def task_done():
+    ts = kget("tasks", [])
+    for t in ts:
+        if t["id"] == request.json["id"]:
+            t["done"] = 1
+    kset("tasks", ts)
+    return jsonify(ok=1)
+
+
+@app.post("/api/resume")
+def resume():
+    f = request.files["file"]
+    text = ("\n".join((p.extract_text() or "") for p in PdfReader(f).pages)
+            if f.filename.lower().endswith(".pdf") else f.read().decode("utf8", "ignore"))
+    return jsonify(text=ai("You are a senior tech recruiter and interview coach. " + persona(),
+                           "Analyse this resume for Gen AI / Python / Data Science roles. Give: ATS score /100, "
+                           "strengths, gaps, rewritten bullets, projects to add, 10 likely interview questions from "
+                           "THIS resume, 7-day plan. Markdown.\n\n" + text[:9000]))
+
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
